@@ -53,6 +53,11 @@ const app = new Elysia()
             set.status = 400;
             return { error: "Invalid id" };
           }
+          const existing = await prisma.product.findUnique({ where: { id } });
+          if (!existing) {
+            set.status = 404;
+            return { error: "Product not found" };
+          }
           const product = await prisma.product.update({
             where: { id },
             data: {
