@@ -1,6 +1,8 @@
 import { Elysia, t } from "elysia";
 import { prisma } from "./lib/prisma";
 
+const idParam = t.Object({ id: t.Numeric() });
+
 const app = new Elysia()
   .get("/", () => ({ message: "Product API", docs: "/products" }))
   .group("/products", (app) =>
@@ -9,19 +11,19 @@ const app = new Elysia()
         const products = await prisma.product.findMany({ orderBy: { id: "asc" } });
         return products;
       })
-      .get("/:id", async ({ params, set }) => {
-        const id = parseInt(params.id, 10);
-        if (Number.isNaN(id)) {
-          set.status = 400;
-          return { error: "Invalid id" };
-        }
-        const product = await prisma.product.findUnique({ where: { id } });
-        if (!product) {
-          set.status = 404;
-          return { error: "Product not found" };
-        }
-        return product;
-      })
+      .get(
+        "/:id",
+        async ({ params, set }) => {
+          const id = Number(params.id);
+          const product = await prisma.product.findUnique({ where: { id } });
+          if (!product) {
+            set.status = 404;
+            return { error: "Product not found" };
+          }
+          return product;
+        },
+        { params: idParam }
+      )
       .post(
         "/",
         async ({ body, set }) => {
@@ -48,11 +50,7 @@ const app = new Elysia()
       .put(
         "/:id",
         async ({ params, body, set }) => {
-          const id = parseInt(params.id, 10);
-          if (Number.isNaN(id)) {
-            set.status = 400;
-            return { error: "Invalid id" };
-          }
+          const id = Number(params.id);
           const existing = await prisma.product.findUnique({ where: { id } });
           if (!existing) {
             set.status = 404;
@@ -70,6 +68,7 @@ const app = new Elysia()
           return product;
         },
         {
+          params: idParam,
           body: t.Object({
             name: t.Optional(t.String({ minLength: 1 })),
             description: t.Optional(t.String()),
@@ -78,20 +77,20 @@ const app = new Elysia()
           }),
         }
       )
-      .delete("/:id", async ({ params, set }) => {
-        const id = parseInt(params.id, 10);
-        if (Number.isNaN(id)) {
-          set.status = 400;
-          return { error: "Invalid id" };
-        }
-        try {
-          await prisma.product.delete({ where: { id } });
-          return { success: true };
-        } catch {
-          set.status = 404;
-          return { error: "Product not found" };
-        }
-      })
+      .delete(
+        "/:id",
+        async ({ params, set }) => {
+          const id = Number(params.id);
+          try {
+            await prisma.product.delete({ where: { id } });
+            return { success: true };
+          } catch {
+            set.status = 404;
+            return { error: "Product not found" };
+          }
+        },
+        { params: idParam }
+      )
   )
   .listen(3000);
 
