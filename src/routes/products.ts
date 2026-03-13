@@ -1,5 +1,12 @@
 import { Elysia, t } from "elysia";
-import { prisma } from "../lib/prisma";
+import {
+  NotFoundError,
+  createProduct,
+  deleteProduct,
+  getProductById,
+  listProducts,
+  updateProduct,
+} from "../services/products";
 
 const idParam = t.Object({ id: t.Numeric() });
 
@@ -17,25 +24,40 @@ const productUpdateBody = t.Object({
   stock: t.Optional(t.Number({ minimum: 0 })),
 });
 
+const paginationQuery = t.Object({
+  page: t.Optional(t.Numeric({ minimum: 1 })),
+  pageSize: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+});
+
 export const productsRoute = new Elysia({ prefix: "/products" })
   // 查 - 列表
-  .get("/", async () => {
-    const products = await prisma.product.findMany({
-      orderBy: { id: "asc" },
-    });
-    return products;
-  })
+  .get(
+    "/",
+    async ({ query }) => {
+      const { page, pageSize } = query;
+      const result = await listProducts({
+        page: page,
+        pageSize: pageSize,
+      });
+      return result;
+    },
+    { query: paginationQuery }
+  )
   // 查 - 单条
   .get(
     "/:id",
     async ({ params, set }) => {
       const id = Number(params.id);
-      const product = await prisma.product.findUnique({ where: { id } });
-      if (!product) {
-        set.status = 404;
-        return { error: "Product not found" };
+      try {
+        const product = await getProductById(id);
+        return product;
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          set.status = 404;
+          return { error: error.message };
+        }
+        throw error;
       }
-      return product;
     },
     { params: idParam }
   )
@@ -43,13 +65,11 @@ export const productsRoute = new Elysia({ prefix: "/products" })
   .post(
     "/",
     async ({ body, set }) => {
-      const product = await prisma.product.create({
-        data: {
-          name: body.name,
-          description: body.description ?? null,
-          price: body.price,
-          stock: body.stock ?? 0,
-        },
+      const product = await createProduct({
+        name: body.name,
+        description: body.description,
+        price: body.price,
+        stock: body.stock,
       });
       set.status = 201;
       return product;
@@ -61,21 +81,21 @@ export const productsRoute = new Elysia({ prefix: "/products" })
     "/:id",
     async ({ params, body, set }) => {
       const id = Number(params.id);
-      const existing = await prisma.product.findUnique({ where: { id } });
-      if (!existing) {
-        set.status = 404;
-        return { error: "Product not found" };
+      try {
+        const product = await updateProduct(id, {
+          name: body.name,
+          description: body.description,
+          price: body.price,
+          stock: body.stock,
+        });
+        return product;
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          set.status = 404;
+          return { error: error.message };
+        }
+        throw error;
       }
-      const product = await prisma.product.update({
-        where: { id },
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.description !== undefined && { description: body.description }),
-          ...(body.price !== undefined && { price: body.price }),
-          ...(body.stock !== undefined && { stock: body.stock }),
-        },
-      });
-      return product;
     },
     { params: idParam, body: productUpdateBody }
   )
@@ -85,11 +105,14 @@ export const productsRoute = new Elysia({ prefix: "/products" })
     async ({ params, set }) => {
       const id = Number(params.id);
       try {
-        await prisma.product.delete({ where: { id } });
-        return { success: true };
-      } catch {
-        set.status = 404;
-        return { error: "Product not found" };
+        const result = await deleteProduct(id);
+        return result;
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          set.status = 404;
+          return { error: error.message };
+        }
+        throw error;
       }
     },
     { params: idParam }
