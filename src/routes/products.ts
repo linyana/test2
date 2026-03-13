@@ -1,20 +1,24 @@
 import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
 
-const idParam = t.Object({ id: t.Numeric() });
+const idParam = t.Object({
+  id: t.Numeric({
+    minimum: 1,
+  }),
+});
 
 const productBody = t.Object({
-  name: t.String({ minLength: 1 }),
-  description: t.Optional(t.String()),
-  price: t.Number({ minimum: 0 }),
-  stock: t.Optional(t.Number({ minimum: 0 })),
+  name: t.String({ minLength: 1, maxLength: 100 }),
+  description: t.Optional(t.String({ maxLength: 1000 })),
+  price: t.Number({ minimum: 0, maximum: 1_000_000 }),
+  stock: t.Optional(t.Number({ minimum: 0, maximum: 1_000_000 })),
 });
 
 const productUpdateBody = t.Object({
-  name: t.Optional(t.String({ minLength: 1 })),
-  description: t.Optional(t.String()),
-  price: t.Optional(t.Number({ minimum: 0 })),
-  stock: t.Optional(t.Number({ minimum: 0 })),
+  name: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
+  description: t.Optional(t.String({ maxLength: 1000 })),
+  price: t.Optional(t.Number({ minimum: 0, maximum: 1_000_000 })),
+  stock: t.Optional(t.Number({ minimum: 0, maximum: 1_000_000 })),
 });
 
 export const productsRoute = new Elysia({ prefix: "/products" })
